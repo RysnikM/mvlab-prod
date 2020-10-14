@@ -92,19 +92,19 @@
       </div>
       <div class="time-items">
         <div class="time-item">
-          <p>Общее время</p>{{ timeStatus.all }}
+          <p>Общее время</p>{{ timeStatusOut.all }}
         </div>
         <div class="time-item">
-          <p>Время простоя</p>{{ timeStatus.idle }}
+          <p>Время простоя</p>{{ timeStatusOut.idle }}
         </div>
         <div class="time-item">
-          <p>Время аварий</p>{{ timeStatus.crash }}
+          <p>Время аварий</p>{{ timeStatusOut.crash }}
         </div>
         <div class="time-item">
-          <p>Время в выключении</p>{{ timeStatus.off }}
+          <p>Время в выключении</p>{{ timeStatusOut.off }}
         </div>
         <div class="time-item">
-          <p>Время работы</p>{{ timeStatus.working }}
+          <p>Время работы</p>{{ timeStatusOut.working }}
         </div>
       </div>
       <div class="top5">
@@ -131,9 +131,10 @@
       <!-- Таблица -->
     </div>
     <!-- График -->
-    <VchartBox v-show="isVchartBoxVisible" @changeShow="closeVchartBoxVisible" :content="content"></VchartBox>
+    <VchartBox v-show="isVchartBoxVisible" @changeShow="closeVchartBoxVisible" :content="content"
+               :key="idx"></VchartBox>
 
-<!--    Loader-->
+    <!--    Loader-->
     <Loader v-if="loader"/>
   </div>
 </template>
@@ -146,13 +147,17 @@ import Table from "@/components/Table";
 import VchartBox from "@/components/VchartBox";
 import Loader from "@/components/Loader";
 
-// var nowDate = new Date();
+import Highcharts from "highcharts";
+
+var nowDate = new Date();
 let legendVisible = {
   A: false,
   P: false,
   Q: false,
   OEE: true,
 };
+
+let range = (8 * 3600 * 1000);
 
 export default {
   layout: "header_footer",
@@ -163,15 +168,9 @@ export default {
     this.setActiveTabHeader("OEE");
     this.setActiveTabSidebar("Online");
 
-    let opt = {
-      id: this.idx,
-      start: this.getChartTime.start,
-      end: this.getChartTime.end,
-    }
-    this.$store.dispatch('oeecharts/getTimeStatus', opt);
-    this.$store.dispatch('oeecharts/getReason', opt);
-    this.$store.dispatch('oeecharts/loadData', opt);
-    localStorage.setItem('idx', this.idx);
+    this.getTimeStatus(this.opt);
+    this.getReason(this.opt);
+    this.getBasicData(this.opt);
   },
 
   components: {
@@ -183,13 +182,17 @@ export default {
   data() {
     return {
       isVchartBoxVisible: false,
-
-      range: (8 * 3600 * 1000),
-
+      range: range,
       periodActive: [false, true, false, false, false],
       // cntPoint: 5,
       selected: "spline",
       typeChart: [{value: "area"}, {value: "column"}, {value: "line"}],
+      opt: {
+        idx: this.idx ? this.idx : 0,
+        chart: 'OEE',
+        start: parseInt((nowDate.getTime() + nowDate.getTimezoneOffset()*60*1000 - range) / 1000),
+        end: parseInt((nowDate.getTime() + nowDate.getTimezoneOffset()*60*1000)/ 1000),
+      },
     };
   },
 
@@ -204,8 +207,16 @@ export default {
       reason: "reason",
       timeStatus: "timeStatus",
       loader: "loader",
-      getChartTime: "getChartTime",
     }),
+
+    timeStatusOut() {
+      let newTimeStatus = {};
+      for (let key in this.timeStatus)
+        if (this.timeStatus.hasOwnProperty(key))
+          newTimeStatus[key] = formatTime(this.timeStatus[key]);
+
+      return newTimeStatus;
+    },
 
     dataHead() {
       let statusOEE = "ok";
@@ -249,8 +260,9 @@ export default {
 
     content: function () {
       return {
-        fist: this.getChartTime.start,
-        last: this.getChartTime.end,
+        id: this.opt.idx,
+        fist: this.opt.start,
+        last: this.opt.end,
         title: "Настройка отображения графиков",
         btnLeft: "Экспорт",
         btnRight: "Обновить",
@@ -262,7 +274,7 @@ export default {
     chartOptions() {
       let arrOptions = {};
       let chartOption;
-
+      var vm = this;
       chartOption = {
         chart: this.basicOptions.chart,
 
@@ -323,6 +335,7 @@ export default {
             events: {
               legendItemClick: function (e) {
                 legendVisible[this.name] = !this.visible;
+                console.log(this.name);
               },
             },
 
@@ -410,17 +423,17 @@ export default {
         id: this.idx,
         name: this.idx + 1,
         option: chartOption,
-        A: this.basicData.length ? Number(
+        A: (this.basicData.length && this.basicData[0].length) ? Number(
             this.basicData[0][
             this.basicData[0].length - 1
                 ][1] * 100
         ).toFixed() : 0,
-        P: this.basicData.length ? Number(
+        P: (this.basicData.length && this.basicData[1].length) ? Number(
             this.basicData[1][
             this.basicData[1].length - 1
                 ][1] * 100
         ).toFixed() : 0,
-        Q: this.basicData.length ? Number(
+        Q: (this.basicData.length && this.basicData[2].length) ? Number(
             this.basicData[2][
             this.basicData[2].length - 1
                 ][1] * 100
@@ -432,18 +445,12 @@ export default {
         ).toFixed() : 0,
       };
 
-      let opt = {
-        id: this.idx,
-        start: this.getChartTime.start,
-        end: this.getChartTime.end,
-      }
 
-      let idx = parseInt(localStorage.getItem('idx'));
-      if (idx !== this.idx){
-        localStorage.setItem('idx', this.idx);
-        this.$store.dispatch('oeecharts/getTimeStatus', opt);
-        this.$store.dispatch('oeecharts/getReason', opt);
-        this.$store.dispatch('oeecharts/loadData', opt);
+      if (this.opt.idx !== this.idx) {
+        this.opt.idx = this.idx;
+        this.getTimeStatus(this.opt);
+        this.getReason(this.opt);
+        this.getBasicData(this.opt);
       }
       return arrOptions;
     },
@@ -482,7 +489,8 @@ export default {
           yAxis: {
             title: {
               enabled: false
-            }
+            },
+
           },
 
           legend: {
@@ -493,7 +501,9 @@ export default {
               borderWidth: 0,
               dataLabels: {
                 enabled: true,
-                format: '{point.y:.1f}'
+                formatter: function () {
+                  return formatTime(this.y);
+                }
               }
             }
           },
@@ -503,7 +513,12 @@ export default {
               colorByPoint: true,
               data: this.reason
             }
-          ]
+          ],
+          tooltip: {
+            formatter: function () {
+              return this.y + 'сек';
+            }
+          },
         }
       }
     },
@@ -515,8 +530,11 @@ export default {
       prevChart: "prevChart",
       addPoint: "addPoint",
       removePoint: "removePoint",
-      loadData: "loadData",
+      getBasicData: "getBasicData",
+      getTimeStatus: "getTimeStatus",
+      getReason: "getReason",
       loadBasicOptions: "loadBasicOptions",
+      getBasicDataAPQ: "getBasicDataAPQ",
     }),
     ...mapActions("users", {
       setActiveTabHeader: "setActiveTabHeader",
@@ -529,15 +547,10 @@ export default {
       this.periodActive = this.periodActive.map((item) => false);
       this.periodActive.splice(sel.id, 1, true);
 
-      // active
-      let opt = {
-        id: this.idx,
-        start: this.getChartTime.start,
-        end: this.getChartTime.start + sel.period * 3600,
-      }
-      this.$store.dispatch('oeecharts/getTimeStatus', opt);
-      this.$store.dispatch('oeecharts/getReason', opt);
-      this.$store.dispatch('oeecharts/loadData', opt);
+      this.opt.start = this.opt.end - sel.period * 3600;
+      this.getTimeStatus(this.opt);
+      this.getReason(this.opt);
+      this.getBasicData(this.opt);
     },
 
     showVchartBoxVisible() {
@@ -562,9 +575,9 @@ export default {
       let xPoint = {
         machineid: idxPoint,
         X: formatDate(dateX),
-        A: this.basicData[0][e.point.index][1],
-        P: this.basicData[1][e.point.index][1],
-        Q: this.basicData[2][e.point.index][1],
+        A: this.basicData[0].length ? this.basicData[0][e.point.index][1] : "",
+        P: this.basicData[0].length ? this.basicData[1][e.point.index][1] : "",
+        Q: this.basicData[0].length ? this.basicData[2][e.point.index][1] : "",
         OEE: this.basicData[3][e.point.index][1],
         color: "#FF0000",
         width: 1,
@@ -595,6 +608,13 @@ function formatDate(date = nowDate) {
   minutes = minutes < 10 ? "0" + minutes : minutes;
 
   return `${dayOfMonth}.${month}.${year} ${hour}:${minutes}`;
+}
+
+function formatTime(time) {
+  let hour = Math.trunc(time / 3600);
+  let min = Math.trunc((time - hour * 3600) / 60);
+  let sec = time - hour * 3600 - min * 60;
+  return `${hour}h:${min}m:${sec}s`;
 }
 </script>
 
