@@ -120,8 +120,41 @@
     <!-- График -->
     <div class="charts-items">
       <highcharts
+          v-show="isChartOne"
           class="highchart"
           :options="chartOptions.option"
+          :constructor-type="'stockChart'"
+          :lang="basicOptions.lang"
+      ></highcharts>
+
+      <highcharts
+          v-show="!isChartOne"
+          class="highchart"
+          :options="chartOptions.optionA"
+          :constructor-type="'stockChart'"
+          :lang="basicOptions.lang"
+      ></highcharts>
+
+      <highcharts
+          v-show="!isChartOne"
+          class="highchart"
+          :options="chartOptions.optionP"
+          :constructor-type="'stockChart'"
+          :lang="basicOptions.lang"
+      ></highcharts>
+
+      <highcharts
+          v-show="!isChartOne"
+          class="highchart"
+          :options="chartOptions.optionQ"
+          :constructor-type="'stockChart'"
+          :lang="basicOptions.lang"
+      ></highcharts>
+
+      <highcharts
+          v-show="!isChartOne"
+          class="highchart"
+          :options="chartOptions.optionOEE"
           :constructor-type="'stockChart'"
           :lang="basicOptions.lang"
       ></highcharts>
@@ -149,7 +182,9 @@ import Loader from "@/components/Loader";
 
 import Highcharts from "highcharts";
 
-var nowDate = new Date();
+const nowDate = new Date();
+// const nowDateTime = nowDate.getTime() - nowDate.getTimezoneOffset() * 60 * 1000;
+const nowDateTime = nowDate.getTime();
 let legendVisible = {
   A: false,
   P: false,
@@ -171,6 +206,13 @@ export default {
     this.getTimeStatus(this.opt);
     this.getReason(this.opt);
     this.getBasicData(this.opt);
+    this.getTableOEE(this.opt);
+
+    Highcharts.setOptions({
+      global: {
+        timezoneOffset: -3 * 60,
+      }
+    });
   },
 
   components: {
@@ -188,10 +230,11 @@ export default {
       selected: "spline",
       typeChart: [{value: "area"}, {value: "column"}, {value: "line"}],
       opt: {
+        smena: 1,
         idx: this.idx ? this.idx : 0,
         chart: 'OEE',
-        start: parseInt((nowDate.getTime() + nowDate.getTimezoneOffset()*60*1000 - range) / 1000),
-        end: parseInt((nowDate.getTime() + nowDate.getTimezoneOffset()*60*1000)/ 1000),
+        start: parseInt((nowDateTime - range) / 1000),
+        end: parseInt(nowDateTime / 1000),
       },
     };
   },
@@ -207,6 +250,8 @@ export default {
       reason: "reason",
       timeStatus: "timeStatus",
       loader: "loader",
+      tableOEE: "tableOEE",
+      isChartOne: "isChartOne",
     }),
 
     timeStatusOut() {
@@ -260,9 +305,7 @@ export default {
 
     content: function () {
       return {
-        id: this.opt.idx,
-        fist: this.opt.start,
-        last: this.opt.end,
+        opt: this.opt,
         title: "Настройка отображения графиков",
         btnLeft: "Экспорт",
         btnRight: "Обновить",
@@ -274,18 +317,14 @@ export default {
     chartOptions() {
       let arrOptions = {};
       let chartOption;
-      var vm = this;
       chartOption = {
         chart: this.basicOptions.chart,
 
         navigator: {
           adaptToUpdatedData: false,
-          // series: [
-          //   {data: this.basicData[this.idx][0]},
-          //   {data: this.basicData[this.idx][1]},
-          //   {data: this.basicData[this.idx][2]},
-          //   {data: this.basicData[this.idx][3]},
-          //   ],
+          series: [
+            {data: this.basicData[3]},
+          ],
         },
 
         scrollbar: this.basicOptions.scrollbar,
@@ -324,7 +363,6 @@ export default {
             point: {
               events: {
                 click: (e) => {
-                  return;
                 },
               },
             },
@@ -335,7 +373,6 @@ export default {
             events: {
               legendItemClick: function (e) {
                 legendVisible[this.name] = !this.visible;
-                console.log(this.name);
               },
             },
 
@@ -419,30 +456,463 @@ export default {
         ],
       };
 
+
+      let chartOptionA = {
+        chart: this.basicOptions.chart,
+
+        navigator: {
+          adaptToUpdatedData: false,
+          series: [
+            {data: this.basicData[0]},
+          ],
+        },
+
+        scrollbar: this.basicOptions.scrollbar,
+
+        exporting: {
+          enabled: false,
+        },
+
+        credits: {
+          enabled: false,
+        },
+
+        legend: this.basicOptions.legendAll,
+        yAxis: this.basicOptions.yAxisAll,
+        xAxis: {
+          range: this.range,
+          // plotLines: this.arrPoint,
+          plotLines: this.currentArrPoint,
+        },
+
+        tooltip: this.basicOptions.tooltip,
+
+        rangeSelector: {
+          enabled: false,
+        },
+
+        plotOptions: {
+          xrange: {
+            showInLegend: false,
+
+            borderRadius: 0,
+            borderWidth: 0,
+            pointWidth: 100,
+            grouping: false,
+            colorByPoint: true,
+            point: {
+              events: {
+                click: (e) => {
+                },
+              },
+            },
+          },
+
+          series: {
+            cursor: "pointer",
+            events: {
+              // legendItemClick: function (e) {
+              //   legendVisible[this.name] = !this.visible;
+              // },
+            },
+
+            point: {
+              events: {
+                click: (e) => {
+                  this.sendPoint(e);
+                  return;
+                },
+              },
+            },
+          },
+        },
+
+        series: [
+          {
+            name: "A",
+            type: this.selected,
+            yAxis: 0,
+            keys: ["x", "y", "id"],
+            data: this.basicData.length ? this.basicData[0] : [],
+            color: '#ffdb66'
+          },
+          {
+            name: "работает",
+            type: "xrange",
+            yAxis: 4,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[5] : [],
+          },
+          {
+            name: "простой",
+            type: "xrange",
+            yAxis: 5,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[6] : [],
+          },
+          {
+            name: "выключен",
+            type: "xrange",
+            yAxis: 6,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[7] : [],
+          },
+
+          {
+            name: "авария",
+            type: "xrange",
+            yAxis: 7,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[8] : [],
+          },
+        ],
+      };
+
+      let chartOptionP = {
+        chart: this.basicOptions.chart,
+
+        navigator: {
+          adaptToUpdatedData: false,
+          series: [
+            {data: this.basicData[1]},
+          ],
+        },
+
+        scrollbar: this.basicOptions.scrollbar,
+
+        exporting: {
+          enabled: false,
+        },
+
+        credits: {
+          enabled: false,
+        },
+
+        legend: this.basicOptions.legendAll,
+        yAxis: this.basicOptions.yAxisAll,
+        xAxis: {
+          range: this.range,
+          // plotLines: this.arrPoint,
+          plotLines: this.currentArrPoint,
+        },
+
+        tooltip: this.basicOptions.tooltip,
+
+        rangeSelector: {
+          enabled: false,
+        },
+
+        plotOptions: {
+          xrange: {
+            showInLegend: false,
+
+            borderRadius: 0,
+            borderWidth: 0,
+            pointWidth: 100,
+            grouping: false,
+            colorByPoint: true,
+            point: {
+              events: {
+                click: (e) => {
+                },
+              },
+            },
+          },
+
+          series: {
+            cursor: "pointer",
+            events: {
+              // legendItemClick: function (e) {
+              //   legendVisible[this.name] = !this.visible;
+              // },
+            },
+
+            point: {
+              events: {
+                click: (e) => {
+                  this.sendPoint(e);
+                  return;
+                },
+              },
+            },
+          },
+        },
+
+        series: [
+          {
+            name: "P",
+            type: this.selected,
+            yAxis: 0,
+            keys: ["x", "y", "id"],
+            data: this.basicData.length ? this.basicData[1] : [],
+            color: '#8ccf9c',
+          },
+          {
+            name: "работает",
+            type: "xrange",
+            yAxis: 4,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[5] : [],
+          },
+          {
+            name: "простой",
+            type: "xrange",
+            yAxis: 5,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[6] : [],
+          },
+          {
+            name: "выключен",
+            type: "xrange",
+            yAxis: 6,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[7] : [],
+          },
+
+          {
+            name: "авария",
+            type: "xrange",
+            yAxis: 7,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[8] : [],
+          },
+        ],
+      };
+
+      let chartOptionQ = {
+        chart: this.basicOptions.chart,
+
+        navigator: {
+          adaptToUpdatedData: false,
+          series: [
+            {data: this.basicData[2]},
+          ],
+        },
+
+        scrollbar: this.basicOptions.scrollbar,
+
+        exporting: {
+          enabled: false,
+        },
+
+        credits: {
+          enabled: false,
+        },
+
+        legend: this.basicOptions.legendAll,
+        yAxis: this.basicOptions.yAxisAll,
+        xAxis: {
+          range: this.range,
+          // plotLines: this.arrPoint,
+          plotLines: this.currentArrPoint,
+        },
+
+        tooltip: this.basicOptions.tooltip,
+
+        rangeSelector: {
+          enabled: false,
+        },
+
+        plotOptions: {
+          xrange: {
+            showInLegend: false,
+
+            borderRadius: 0,
+            borderWidth: 0,
+            pointWidth: 100,
+            grouping: false,
+            colorByPoint: true,
+            point: {
+              events: {
+                click: (e) => {
+                },
+              },
+            },
+          },
+
+          series: {
+            cursor: "pointer",
+            events: {
+              // legendItemClick: function (e) {
+              //   legendVisible[this.name] = !this.visible;
+              // },
+            },
+
+            point: {
+              events: {
+                click: (e) => {
+                  this.sendPoint(e);
+                  return;
+                },
+              },
+            },
+          },
+        },
+
+        series: [
+          {
+            name: "Q",
+            type: this.selected,
+            yAxis: 0,
+            keys: ["x", "y", "id"],
+            data: this.basicData.length ? this.basicData[2] : [],
+            color: '#66b0ff',
+          },
+          {
+            name: "работает",
+            type: "xrange",
+            yAxis: 4,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[5] : [],
+          },
+          {
+            name: "простой",
+            type: "xrange",
+            yAxis: 5,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[6] : [],
+          },
+          {
+            name: "выключен",
+            type: "xrange",
+            yAxis: 6,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[7] : [],
+          },
+
+          {
+            name: "авария",
+            type: "xrange",
+            yAxis: 7,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[8] : [],
+          },
+        ],
+      };
+
+      let chartOptionOEE = {
+        chart: this.basicOptions.chart,
+
+        navigator: {
+          adaptToUpdatedData: false,
+          series: [
+            {data: this.basicData[3]},
+          ],
+        },
+
+        scrollbar: this.basicOptions.scrollbar,
+
+        exporting: {
+          enabled: false,
+        },
+
+        credits: {
+          enabled: false,
+        },
+
+        legend: this.basicOptions.legendAll,
+        yAxis: this.basicOptions.yAxisAll,
+        xAxis: {
+          range: this.range,
+          // plotLines: this.arrPoint,
+          plotLines: this.currentArrPoint,
+        },
+
+        tooltip: this.basicOptions.tooltip,
+
+        rangeSelector: {
+          enabled: false,
+        },
+
+        plotOptions: {
+          xrange: {
+            showInLegend: false,
+
+            borderRadius: 0,
+            borderWidth: 0,
+            pointWidth: 100,
+            grouping: false,
+            colorByPoint: true,
+            point: {
+              events: {
+                click: (e) => {
+                },
+              },
+            },
+          },
+
+          series: {
+            cursor: "pointer",
+            events: {
+              // legendItemClick: function (e) {
+              //   legendVisible[this.name] = !this.visible;
+              // },
+            },
+
+            point: {
+              events: {
+                click: (e) => {
+                  this.sendPoint(e);
+                  return;
+                },
+              },
+            },
+          },
+        },
+
+        series: [
+          {
+            name: "OEE",
+            type: this.selected,
+            yAxis: 0,
+            keys: ["x", "y", "id"],
+            data: this.basicData.length ? this.basicData[3] : [],
+            color: '#000000',
+          },
+          {
+            name: "работает",
+            type: "xrange",
+            yAxis: 4,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[5] : [],
+          },
+          {
+            name: "простой",
+            type: "xrange",
+            yAxis: 5,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[6] : [],
+          },
+          {
+            name: "выключен",
+            type: "xrange",
+            yAxis: 6,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[7] : [],
+          },
+
+          {
+            name: "авария",
+            type: "xrange",
+            yAxis: 7,
+            keys: ["x", "x2", "y", "id", "color"],
+            data: this.basicData.length ? this.basicData[8] : [],
+          },
+        ],
+      };
+
       arrOptions = {
         id: this.idx,
         name: this.idx + 1,
         option: chartOption,
-        A: (this.basicData.length && this.basicData[0].length) ? Number(
-            this.basicData[0][
-            this.basicData[0].length - 1
-                ][1] * 100
-        ).toFixed() : 0,
-        P: (this.basicData.length && this.basicData[1].length) ? Number(
-            this.basicData[1][
-            this.basicData[1].length - 1
-                ][1] * 100
-        ).toFixed() : 0,
-        Q: (this.basicData.length && this.basicData[2].length) ? Number(
-            this.basicData[2][
-            this.basicData[2].length - 1
-                ][1] * 100
-        ).toFixed() : 0,
-        OEE: this.basicData.length ? Number(
-            this.basicData[3][
-            this.basicData[3].length - 1
-                ][1] * 100
-        ).toFixed() : 0,
+        optionA: chartOptionA,
+        optionP: chartOptionP,
+        optionQ: chartOptionQ,
+        optionOEE: chartOptionOEE,
+        A: (this.tableOEE.A * 100).toFixed(),
+        P: (this.tableOEE.P * 100).toFixed(),
+        Q: (this.tableOEE.Q * 100).toFixed(),
+        OEE: (this.tableOEE.OEE * 100).toFixed(),
       };
 
 
@@ -451,6 +921,7 @@ export default {
         this.getTimeStatus(this.opt);
         this.getReason(this.opt);
         this.getBasicData(this.opt);
+        this.getTableOEE(this.opt);
       }
       return arrOptions;
     },
@@ -534,7 +1005,7 @@ export default {
       getTimeStatus: "getTimeStatus",
       getReason: "getReason",
       loadBasicOptions: "loadBasicOptions",
-      getBasicDataAPQ: "getBasicDataAPQ",
+      getTableOEE: "getTableOEE",
     }),
     ...mapActions("users", {
       setActiveTabHeader: "setActiveTabHeader",
@@ -542,15 +1013,19 @@ export default {
     }),
 
     setRange(sel) {
-      this.range = 0;
       this.range = sel.period * 1000 * 3600;
       this.periodActive = this.periodActive.map((item) => false);
       this.periodActive.splice(sel.id, 1, true);
 
       this.opt.start = this.opt.end - sel.period * 3600;
+      if (sel.period === 8)
+        this.opt.smena = 1;
+      else
+        this.opt.smena = 0;
       this.getTimeStatus(this.opt);
       this.getReason(this.opt);
       this.getBasicData(this.opt);
+      this.getTableOEE(this.opt);
     },
 
     showVchartBoxVisible() {
@@ -567,7 +1042,7 @@ export default {
     changeLastData(val) {
       //this.lastDate =formatDate(val);
     },
-
+/////////////////
     sendPoint(e) {
       let dateX = new Date(e.point.x);
       dateX.getTimezoneOffset();
@@ -657,6 +1132,7 @@ div {
   padding-left: 24px;
   padding-right: 18px;
   overflow-y: auto;
+  padding-bottom: 50px;
 }
 
 .highchart {
